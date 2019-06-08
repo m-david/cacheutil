@@ -6,14 +6,23 @@ public class Arguments {
 
     private String xmlFile = "hazelcast-client.xml";
     private String cacheName = null;
-    private String key = null;
+    private Object key = null;
+    private Object value = null;
     private Action action = Action.get;
 
-    public String getKey() {
+    public Object getValue() {
+        return value;
+    }
+
+    public void setValue(Object value) {
+        this.value = value;
+    }
+
+    public Object getKey() {
         return key;
     }
 
-    public void setKey(String key) {
+    public void setKey(Object key) {
         this.key = key;
     }
 
@@ -46,7 +55,8 @@ public class Arguments {
         return "Arguments{" +
                 "xmlFile='" + xmlFile + '\'' +
                 ", cacheName='" + cacheName + '\'' +
-                ", key='" + key + '\'' +
+                ", key=" + key +
+                ", value=" + value +
                 ", action=" + action +
                 '}';
     }
@@ -55,10 +65,22 @@ public class Arguments {
     {
         /// create the Options
         Options options = new Options();
-        options.addOption("x", "xml-file", true, "the hazelcast client config xml-file." );
-        options.addOption("n", "cache-name", true, "the cache name" );
-        options.addOption("k", "key", true, "the key name" );
-        options.addOption("a", "action", true, "action to take: <get, getAll, destroy, remove>" );
+        options.addOption("x", "xml-file", true, "The hazelcast client config xml-file." );
+        options.addOption("n", "cache-name", true, "The cache name" );
+
+        options.addOption("k", "key", true, "The key" );
+        options.addOption("v", "value", true, "The value" );
+
+        options.addOption("h", "help", false, "help" );
+
+        options.addOption("a", "action", true,
+                "Action to take: \n" +
+                        "'get' <key> from <cache-name>\n" +
+                        "'put' <key> the <value> into <cache-name>\n" +
+                        "'getAll' <cache-name>\n" +
+                        "'create' <cache-name>\n" +
+                        "'destroy' <cache-name>\n" +
+                        "'remove' <key> from <cache-name>" );
 
         return options;
     }
@@ -73,18 +95,34 @@ public class Arguments {
         try {
             line = parser.parse( options, args );
 
-            if( line.hasOption( "xml-file" ) ) {
+            if( line.hasOption( "help" ) ) {
+                arguments.setAction(Action.usage);
+                return arguments;
+            }
+
+//            if( line.hasOption( "action" ) ) {
+            arguments.setAction(Action.valueOf(line.getOptionValue("action")));
+//            }
+
+//            if( line.hasOption( "xml-file" ) ) {
                 arguments.setXmlFile(line.getOptionValue("xml-file"));
-            }
-            if( line.hasOption( "cache-name" ) ) {
+//            }
+//            if( line.hasOption( "cache-name" ) ) {
                 arguments.setCacheName(line.getOptionValue("cache-name"));
+//            }
+
+            switch (arguments.getAction()) {
+                case get:
+                case remove:
+                    arguments.setKey(line.getOptionValue("key"));
+                    break;
+
+                case put:
+                    arguments.setKey(line.getOptionValue("key"));
+                    arguments.setValue(line.getOptionValue("value"));
+                    break;
             }
-            if( line.hasOption( "key" ) ) {
-                arguments.setKey(line.getOptionValue("key"));
-            }
-            if( line.hasOption( "action" ) ) {
-                arguments.setAction(Action.valueOf(line.getOptionValue("action")));
-            }
+
 
         } catch (ParseException e) {
             e.printStackTrace();

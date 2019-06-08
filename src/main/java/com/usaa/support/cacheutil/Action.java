@@ -5,7 +5,8 @@ public enum Action {
     get,
     getAll,
     remove,
-//    destroy,
-//    create,
+    destroy,
+    create,
+    put,
     usage;
 }

@@ -86,21 +86,21 @@ public class CacheUtil
 
         int returnResult = 0;
 
-//        if(Action.create.equals(arguments.getAction()))
-//        {
-//            if(create(cacheManager))
-//            {
-//                log(Level.INFO,"Created cache named: " + arguments.getCacheName());
-//            }
-//            else
-//            {
-//                log(Level.INFO,"Failed to create cache named: " + arguments.getCacheName());
-//                returnResult = -2;
-//            }
-//            return returnResult;
-//
-//
-//        }
+        if(Action.create.equals(arguments.getAction()))
+        {
+            if(create(cacheManager))
+            {
+                log(Level.INFO,"Created cache named: " + arguments.getCacheName());
+            }
+            else
+            {
+                log(Level.INFO,"Failed to create cache named: " + arguments.getCacheName());
+                returnResult = -2;
+            }
+            return returnResult;
+
+
+        }
 
         if(cacheManager.getCache(arguments.getCacheName()) == null)
         {
@@ -123,6 +123,16 @@ public class CacheUtil
                 }
             }
             break;
+            case put:
+            {
+                boolean result = put(cache, arguments.getKey(), arguments.getValue());
+                if (result) {
+                    log(Level.INFO,arguments.getKey() + " put successful.");
+                } else {
+                    log(Level.INFO,arguments.getKey() + ": put unsuccessful.");
+                }
+            }
+                break;
             case remove: {
                 boolean result = remove(cache, arguments.getKey());
                 if (result) {
@@ -132,14 +142,14 @@ public class CacheUtil
                 }
             }
             break;
-//            case destroy: {
-//                if (destroy(cache)) {
-//                    log(Level.INFO, "Successfully destroyed cache name: " + arguments.getCacheName());
-//                } else {
-//                    log(Level.INFO, "Failed to destroy cache name: " + arguments.getCacheName());
-//                }
-//            }
-//                break;
+            case destroy: {
+                if (destroy(cache)) {
+                    log(Level.INFO, "Successfully destroyed cache name: " + arguments.getCacheName());
+                } else {
+                    log(Level.INFO, "Failed to destroy cache name: " + arguments.getCacheName());
+                }
+            }
+                break;
             case getAll:
                 getAll(cache);
 
@@ -164,9 +174,14 @@ public class CacheUtil
 
     private boolean create(CacheManager cacheManager)
     {
-        CompleteConfiguration<Object, Object> config =
-                new MutableConfiguration<Object, Object>()
-                        .setTypes( Object.class, Object.class );
+//        CompleteConfiguration<Object, Object> config =
+//                new MutableConfiguration<Object, Object>()
+//                        .setTypes( Object.class, Object.class );
+
+        MutableConfiguration<Object, Object> config = new MutableConfiguration<>();
+        config.setStoreByValue(true)
+                .setTypes(Object.class, Object.class)
+                .setStatisticsEnabled(true);
 
         log(Level.FINE,"About to create cache named: " + arguments.getCacheName());
         Cache<Object, Object> cache = cacheManager.createCache(arguments.getCacheName(), config);
@@ -183,12 +198,18 @@ public class CacheUtil
         return cache.isDestroyed();
     }
 
-    private Object get(Cache<Object, Object> cache, String key)
+    private boolean put(Cache<Object, Object> cache, Object key, Object value)
+    {
+        cache.put(key, value);
+        return cache.containsKey(key);
+    }
+
+    private Object get(Cache<Object, Object> cache, Object key)
     {
         return cache.get(key);
     }
 
-    private boolean remove(Cache<Object, Object> cache, String key)
+    private boolean remove(Cache<Object, Object> cache, Object key)
     {
         boolean result = cache.remove(key);
         if(cache.containsKey(key))
