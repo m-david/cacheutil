@@ -58,7 +58,7 @@ public class Arguments {
         options.addOption("x", "xml-file", true, "the hazelcast client config xml-file." );
         options.addOption("n", "cache-name", true, "the cache name" );
         options.addOption("k", "key", true, "the key name" );
-        options.addOption("a", "action", true, "the action to take" );
+        options.addOption("a", "action", true, "action to take: <get, getAll, destroy, remove>" );
 
         return options;
     }

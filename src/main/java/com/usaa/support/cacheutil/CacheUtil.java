@@ -1,16 +1,24 @@
 package com.usaa.support.cacheutil;
 
+import com.hazelcast.cache.HazelcastCachingProvider;
 import com.hazelcast.cache.ICache;
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.client.cache.impl.HazelcastClientCachingProvider;
+import com.hazelcast.client.config.ClientClasspathXmlConfig;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.nio.serialization.HazelcastSerializationException;
+import org.apache.commons.cli.HelpFormatter;
 
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
+import javax.cache.configuration.CompleteConfiguration;
+import javax.cache.configuration.MutableConfiguration;
 import javax.cache.spi.CachingProvider;
 import java.util.Iterator;
+import java.util.Properties;
+import java.util.logging.Level;
 
 /**
  * Simple JCache Utility
@@ -18,64 +26,169 @@ import java.util.Iterator;
  */
 public class CacheUtil
 {
+
+    private Arguments arguments;
+    private ILogger logger = null;
+
+    public CacheUtil(Arguments arguments)
+    {
+        this.arguments = arguments;
+    }
+
     public static void main( String[] args )
     {
         Arguments arguments = Arguments.createArguments(args);
 
-        System.out.println(arguments.toString());
+        int execResult = 0;
 
-        ClientConfig clientConfig = ConfigUtility.createClientConfig(arguments);
-        HazelcastInstance client = HazelcastClient.newHazelcastClient(clientConfig);
+        CacheUtil util = new CacheUtil(arguments);
+        if(Action.usage.equals(arguments.getAction()))
+        {
+            util.printHelp();
+        }
+        else
+        {
+            util.executeWith(arguments);
+            HazelcastClient.shutdownAll();
+        }
 
-        CachingProvider cachingProvider = 
-                Caching.getCachingProvider(HazelcastClientCachingProvider.class.getName());
-                //Caching.getCachingProvider();
+        System.exit(execResult);
 
-        CacheManager cacheManager = cachingProvider.getCacheManager();
+    }
 
-        // Create and get the cache.
-        ICache<String, Object> cache = (ICache) cacheManager.getCache(arguments.getCacheName());
-//        client.getDistributedObject("hz:impl:cacheService", arguments.getCacheName());
+    private void printHelp()
+    {
+        HelpFormatter formatter = new HelpFormatter();
+        formatter.printHelp( "java -jar cacheutil.jar", Arguments.createOptions() );
+    }
 
-        System.out.println("Cache [" + arguments.getCacheName() + "] size=" + cache.size());
+    private int executeWith(Arguments arguments)
+    {
+        ClientConfig config = new ClientClasspathXmlConfig(arguments.getXmlFile());
+        config.setInstanceName( "my-named-hazelcast-instance" );
+
+        HazelcastInstance instance = HazelcastClient.newHazelcastClient( config );
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        // Create Properties instance pointing to a named HazelcastInstance
+        Properties properties = HazelcastCachingProvider
+                .propertiesByInstanceName( "my-named-hazelcast-instance" );
+
+        CacheManager cacheManager = cachingProvider
+                .getCacheManager( null, instance.getClass().getClassLoader(), properties );
+
+        log(Level.INFO, "CacheManager:" + cacheManager.toString());
+
+        this.logger = instance.getLoggingService().getLogger(getClass().getName());
+
+        log(Level.INFO, arguments.toString());
+
+        ICache<Object, Object> cache = null;
+
+        int returnResult = 0;
+
+//        if(Action.create.equals(arguments.getAction()))
+//        {
+//            if(create(cacheManager))
+//            {
+//                log(Level.INFO,"Created cache named: " + arguments.getCacheName());
+//            }
+//            else
+//            {
+//                log(Level.INFO,"Failed to create cache named: " + arguments.getCacheName());
+//                returnResult = -2;
+//            }
+//            return returnResult;
+//
+//
+//        }
+
+        if(cacheManager.getCache(arguments.getCacheName()) == null)
+        {
+            log(Level.INFO, "Cache: " + arguments.getCacheName() + " is null.");
+            return -1;
+        }
+
+        cache = cacheManager.getCache(arguments.getCacheName()).unwrap(ICache.class);
+
+        log(Level.INFO, "Cache [" + arguments.getCacheName() + "] size=" + cache.size());
 
         switch (arguments.getAction())
         {
             case get: {
                 Object result = get(cache, arguments.getKey());
                 if (result != null) {
-                    System.out.println("FOUND key [" + arguments.getKey() + "] value: " + result.toString());
+                    log(Level.INFO, "FOUND key [" + arguments.getKey() + "] value: " + result.toString());
                 } else {
-                    System.out.println("Invalid key: " + arguments.getKey());
+                    log(Level.INFO,"Invalid key: " + arguments.getKey());
                 }
             }
-                break;
+            break;
             case remove: {
                 boolean result = remove(cache, arguments.getKey());
                 if (result) {
-                    System.out.println(arguments.getKey() + " removed.");
+                    log(Level.INFO,arguments.getKey() + " removed.");
                 } else {
-                    System.out.println(arguments.getKey() + ": Invalid key.");
+                    log(Level.INFO,arguments.getKey() + ": Invalid key.");
                 }
             }
-                break;
+            break;
+//            case destroy: {
+//                if (destroy(cache)) {
+//                    log(Level.INFO, "Successfully destroyed cache name: " + arguments.getCacheName());
+//                } else {
+//                    log(Level.INFO, "Failed to destroy cache name: " + arguments.getCacheName());
+//                }
+//            }
+//                break;
             case getAll:
                 getAll(cache);
 
 
         }
-        client.shutdown();
-        System.exit(1);
 
+        return returnResult;
 
     }
 
-    private static Object get(Cache<String, Object> cache, String key)
+    private void log(Level level, String message)
+    {
+        if(logger != null)
+        {
+            logger.log(level, message);
+        }
+        else
+        {
+            System.out.println("" + level.getName() + " message: " + message);
+        }
+    }
+
+    private boolean create(CacheManager cacheManager)
+    {
+        CompleteConfiguration<Object, Object> config =
+                new MutableConfiguration<Object, Object>()
+                        .setTypes( Object.class, Object.class );
+
+        log(Level.FINE,"About to create cache named: " + arguments.getCacheName());
+        Cache<Object, Object> cache = cacheManager.createCache(arguments.getCacheName(), config);
+
+        return cache != null;
+    }
+
+    private boolean destroy(ICache<Object, Object> cache)
+    {
+        assert cache != null;
+
+        log(Level.INFO,"About to destroy cache name: " + cache.getName());
+        cache.destroy();
+        return cache.isDestroyed();
+    }
+
+    private Object get(Cache<Object, Object> cache, String key)
     {
         return cache.get(key);
     }
 
-    private static boolean remove(Cache<String, Object> cache, String key)
+    private boolean remove(Cache<Object, Object> cache, String key)
     {
         boolean result = cache.remove(key);
         if(cache.containsKey(key))
@@ -85,12 +198,30 @@ public class CacheUtil
         return result;
     }
 
-    private static void getAll(Cache<String, Object> cache)
+    private void getAll(ICache<Object, Object> cache)
     {
-        Iterator<Cache.Entry<String,Object>> allCacheEntries= cache.iterator();
-        while(allCacheEntries.hasNext()){
-            Cache.Entry<String,Object> currentEntry = allCacheEntries.next();
-            System.out.println("Key: "+currentEntry.getKey()+" Value: "+ currentEntry.getValue().toString());
+        try {
+
+            Iterator<Cache.Entry<Object, Object>> allCacheEntries = cache.iterator();
+            while (allCacheEntries.hasNext()) {
+                Cache.Entry<Object, Object> currentEntry = allCacheEntries.next();
+                log(Level.INFO,"Key: " + currentEntry.getKey() + " Value: " + currentEntry.getValue().toString());
+            }
+        }
+        catch (HazelcastSerializationException e)
+        {
+            log(Level.SEVERE,"*****************************************************************************");
+            log(Level.SEVERE,"Perhaps you should add Cached Object's Domain classes to your ClassPath??????");
+            log(Level.SEVERE,"*****************************************************************************");
+            e.printStackTrace();
+
+        }
+        catch (Exception e)
+        {
+            log(Level.SEVERE,"*****************************************************************************");
+            log(Level.SEVERE,"Unexpected Exception!!!!!");
+            log(Level.SEVERE,"*****************************************************************************");
+            e.printStackTrace();
         }
 
     }
