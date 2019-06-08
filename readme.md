@@ -9,6 +9,7 @@ mkdir ./conf
 ### Execute the jar file
 
 #### Get All Keys
+##### Note: You will get serialization error if cached objects are POJOs
 ```
 java -jar cacheutil.jar --xml-file=hazelcast-cl-custome.xml --cache-name=my-test --action=getAll
 ```
