@@ -74,13 +74,14 @@
                                     <mainClass>com.usaa.support.cacheutil.CacheUtil</mainClass>
                                 </manifest>
                                 <manifestEntries>
-                                    <Class-Path>./conf/</Class-Path>
+                                    <Class-Path>./conf/ ./lib/ ./lib/*</Class-Path>
                                 </manifestEntries>
                             </archive>
                             <descriptorRefs>
                                 <descriptorRef>jar-with-dependencies</descriptorRef>
                             </descriptorRefs>
-                            <finalName>cacheutil.jar</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <finalName>cacheutil</finalName>
                         </configuration>
                         <phase>package</phase>
                         <goals>

@@ -18,6 +18,7 @@ import javax.cache.configuration.MutableConfiguration;
 import javax.cache.spi.CachingProvider;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 
 /**
@@ -65,13 +66,14 @@ public class CacheUtil
     private int executeWith(Arguments arguments)
     {
         ClientConfig config = new ClientClasspathXmlConfig(arguments.getXmlFile());
-        config.setInstanceName( "my-named-hazelcast-instance" );
+        String instanceName = "my-named-hazelcast-instance" + ThreadLocalRandom.current().nextInt();
+        config.setInstanceName(instanceName);
 
         HazelcastInstance instance = HazelcastClient.newHazelcastClient( config );
         CachingProvider cachingProvider = Caching.getCachingProvider();
         // Create Properties instance pointing to a named HazelcastInstance
         Properties properties = HazelcastCachingProvider
-                .propertiesByInstanceName( "my-named-hazelcast-instance" );
+                .propertiesByInstanceName(instanceName);
 
         CacheManager cacheManager = cachingProvider
                 .getCacheManager( null, instance.getClass().getClassLoader(), properties );
@@ -204,7 +206,7 @@ public class CacheUtil
         return cache.containsKey(key);
     }
 
-    private Object get(Cache<Object, Object> cache, Object key)
+    private Object get(ICache<Object, Object> cache, Object key)
     {
         return cache.get(key);
     }
